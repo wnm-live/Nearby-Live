@@ -2,6 +2,7 @@ import React, { Component } from 'react';
 import {
     StyleSheet,
     View,
+    ViewPropTypes,
     Image,
     Modal,
     Button,
@@ -18,13 +19,8 @@ import ImagePicker from 'react-native-image-picker';
 import Video from 'react-native-video';
 import ProgressBar from 'react-native-progress/Circle';
 
-
-
-// additional imports
-import { Icon } from 'react-native-elements'
-
 // const and libs
-import { Text } from '@ui/'
+import { Text, Icon } from '@ui/'
 import { Card } from '@ui/cards/'
 import { AppSizes, AppStyles } from '@theme/'
 import { imageUploader } from '@lib/helper'
@@ -291,7 +287,9 @@ export default class Actions extends React.Component {
                     >
                         <TouchableOpacity style={[AppStyles.row]}  onPress={() => {!isUploading && this.handleSend()}}>
                             <Text style={[styles.modalSend, { opacity:!isUploading ? 1 : 0.5}]} h4>Send</Text>
-                            <Icon containerStyle={[styles.modalSendIcon, { opacity:!isUploading ? 1 : 0.5}]} name='send'/>
+                            <View style={[styles.modalSendIcon, { opacity:!isUploading ? 1 : 0.5}]}>
+                                <Icon name='send'/>
+                            </View>
                         </TouchableOpacity>
                     </TouchableOpacity>
                 </View>
@@ -409,7 +407,7 @@ Actions.propTypes = {
     onSend: React.PropTypes.func,
     options: React.PropTypes.object,
     icon: React.PropTypes.func,
-    containerStyle: View.propTypes.style,
-    wrapperStyle: View.propTypes.style,
-    iconTextStyle: Text.propTypes.style,
+    containerStyle: ViewPropTypes.style,
+    wrapperStyle: ViewPropTypes.style,
+    iconTextStyle: ViewPropTypes.style,
 };

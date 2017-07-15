@@ -8,8 +8,10 @@ import moment from 'moment';
 import React, { Component, PropTypes } from 'react';
 import {
     View,
-    ListView,
+    FlatList,
     RefreshControl,
+    StyleSheet,
+    TouchableOpacity,
     InteractionManager,
 } from 'react-native';
 
@@ -18,7 +20,7 @@ import {
 import { Actions } from 'react-native-router-flux';
 
 // Consts and Libs
-import { AppColors, AppStyles , AppSizes } from '@theme/';
+import { AppColors, AppStyles , AppSizes, AppFonts } from '@theme/';
 import { ErrorMessages } from '@constants/';
 import { getImageURL } from '@lib/util'
 import AppAPI from '@lib/api';
@@ -27,9 +29,7 @@ import AppAPI from '@lib/api';
 import Error from '@components/general/Error';
 import Loading from '@components/general/Loading';
 import ActionSheet from '@expo/react-native-action-sheet';
-import { ListInfinite, List, ListItem } from '@components/ui';
-import { SearchBar, Icon } from 'react-native-elements'
-
+import { Text, Avatar, Icon, SearchBar } from '@components/ui';
 
 
 moment.updateLocale('en', {
@@ -51,6 +51,64 @@ moment.updateLocale('en', {
     }
 });
 
+/* Styles ==================================================================== */
+
+const styles = StyleSheet.create({
+    headerContainer:{
+      backgroundColor:'#FFF',
+        borderBottomWidth: 0.8,
+        borderColor:'#E9EBEE'
+    },
+    row: {
+        backgroundColor: '#fff',
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        margin: 0,
+        paddingHorizontal: 10,
+        paddingVertical: 10,
+        borderRadius: 2,
+        marginBottom: 2,
+        borderColor: '#C8C7CC',
+        borderBottomWidth: 1,
+    },
+    message: {
+        flex: 1,
+        flexDirection: 'column',
+        paddingLeft: 10,
+    },
+    header: {
+        flex: 1,
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+    },
+    user: {
+        fontWeight: 'bold',
+        flex: 1,
+        marginBottom: 2,
+    },
+    time:{
+        fontSize: AppFonts.base.size * 0.7,
+        color:'grey'
+    },
+    badgeContainer: {
+        width:17,
+        height:17,
+        borderRadius:15,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#006e95',
+        marginTop:2,
+    },
+    badgeText:{
+        color:'#FFFFFF',
+        fontSize:AppFonts.base.size * 0.7,
+        fontWeight:'600'
+    }
+});
+
+
+
 /* Component ==================================================================== */
 
 class ConversationsListing extends Component {
@@ -70,31 +128,24 @@ class ConversationsListing extends Component {
             isLoadingMore:false,
             startFrom:-1,
             error:null,
-            dataSource: new ListView.DataSource({
-                rowHasChanged: (row1, row2) => row1 !== row2,
-            })
         };
 
-        this.state.dataSource = this.getUpdatedDataSource(props);
+        this.state.dataSource = props.conversationsListing
 
     }
 
     componentWillReceiveProps(nextProps) {
         if (nextProps.conversationsListing !== this.props.conversationsListing) {
             this.setState({
-                dataSource: this.getUpdatedDataSource(nextProps)
+                dataSource: nextProps.conversationsListing,
             })
         }
     }
 
-    componentDidMount = () => {
+    componentDidMount () {
         InteractionManager.runAfterInteractions(() => {
             this.fetchConversations(true);
         });
-    }
-
-    getUpdatedDataSource = (props) => {
-        return this.state.dataSource.cloneWithRows(props.conversationsListing);
     }
 
     /**
@@ -125,7 +176,7 @@ class ConversationsListing extends Component {
     }
 
 
-    _onLoadMore = async () => {
+    LoadMore = async () => {
 
         const { isLoadingMore, startFrom } = this.state ;
 
@@ -139,12 +190,6 @@ class ConversationsListing extends Component {
                 });
             });
 
-    }
-
-    _canLoadMore = () => {
-        const { isLoadingMore } = this.state
-
-        return !isLoadingMore
     }
 
     _onPressConversation = (conversation) => {
@@ -197,31 +242,46 @@ class ConversationsListing extends Component {
     }
 
 
-    renderRow = (conversation) => {
-        let badgeProps  = {};
+    renderItem = (obj) => {
+        const conversation = obj.item
 
-        conversation.new > 0 ? badgeProps = {badge:{ value: conversation.new  , badgeTextStyle:{fontSize:10, fontWeight:'bold'} , badgeContainerStyle: { padding:8,backgroundColor: '#002C54', borderRadius:5, marginTop:7 } } } : null ;
+        return(
+            <TouchableOpacity style={[ styles.row ]} onPress={ () => {this._onPressConversation(conversation)}}>
+                {!!conversation.img ? (
+                    <Avatar
+                        source={{ uri: getImageURL(conversation.img, true) }}
+                        imgKey={conversation.img}
+                    />
+                ) : (
+                    <Avatar
+                        source={{ uri: getImageURL() }}
+                    />
+                )}
+                <View style={[ styles.message ]}>
+                    <View style={[ styles.header ]}>
+                        <Text style={[ styles.user ]}>
+                            {conversation.name.replace(/(\r\n|\n|\r)/gm,"")}
+                        </Text>
 
-        return (
-            <ListItem
-                roundAvatar
-                hideChevron
-                key={conversation.id}
-                onPress={ () => { this._onPressConversation(conversation) }}
-                onLongPress={() => this._onLongPress(conversation)}
-                title={conversation.name}
-                rightTitleContainerStyle={{flex:0.25}}
-                subtitle={
-                    conversation.msg.length > 1 ? (
-                    (conversation.msg.includes('[PHOTO-MSG]') ? '[Picture Message]' : ((conversation.msg).length > 48) ? (((conversation.msg).substring(0,80)) + '...') : conversation.msg)) : null
-                }
-                subtitleStyle={{textAlign:'left'}}
-                rightTitle={moment(conversation.last).fromNow()}
-                rightTitleStyle={{fontSize:10}}
-                avatar={{uri: getImageURL(conversation.img, true)} }
-                avatarStyle={{ width: 35,height: 35}}
-                {...badgeProps }
-            />
+                        <Text style={[styles.time]}>{moment(conversation.last).fromNow()}</Text>
+
+
+                    </View>
+                    <View style={[ styles.header ]}>
+                        <Text style={[ AppStyles.subtext, AppStyles.flex4 ]}>
+                            {
+                                 conversation.msg.length > 1 ? (
+                                     (conversation.msg.includes('[PHOTO-MSG]') ? '[Picture Message]' : ((conversation.msg).length > 48) ? (((conversation.msg).replace(/(\r\n|\n|\r)/gm,"").substring(0,80)) + '...') : conversation.msg.replace(/(\r\n|\n|\r)/gm,""))) : null
+                             }
+                        </Text>
+                        {!!conversation.new > 0 &&
+                        <View style={[AppStyles.flex1 , AppStyles.rightAligned]}>
+                            <View style={[styles.badgeContainer]}><Text style={[styles.badgeText]}>{ conversation.new }</Text></View>
+                        </View>
+                        }
+                    </View>
+                </View>
+            </TouchableOpacity>
         )
     }
 
@@ -236,7 +296,7 @@ class ConversationsListing extends Component {
         });
 
         this.setState({
-            dataSource: this.getUpdatedDataSource({conversationsListing:newFilter})
+            dataSource: newFilter
         })
 
 
@@ -262,7 +322,7 @@ class ConversationsListing extends Component {
         return (
             <ActionSheet ref={component => this._actionSheetRef = component}>
                 <View style={[AppStyles.container]}>
-                    <View style={[AppStyles.row]}>
+                    <View style={[AppStyles.row, styles.headerContainer]}>
                         <View style={[AppStyles.flex6]}>
                             <SearchBar
                                 lightTheme
@@ -277,28 +337,22 @@ class ConversationsListing extends Component {
                                 name='md-options'
                                 type='ionicon'
                                 color='grey'
+                                size={22}
                                 underlayColor={'transparent'}
                                 onPress={this._onPressOptions} />
                         </View>
-
                     </View>
-                    <List containerStyle={{marginTop:0, height:AppSizes.screen.height-120}}>
-                        <ListView
-                            enableEmptySections
-                            renderScrollComponent={props => <ListInfinite  {...props} />}
-                            renderRow={conversation => this.renderRow(conversation)}
-                            dataSource={dataSource}
-                            canLoadMore={this._canLoadMore}
-                            onLoadMoreAsync={this._onLoadMore}
-                            refreshControl={
-                              <RefreshControl
-                                refreshing={isRefreshing}
-                                onRefresh={ () => { this.fetchConversations(true) } }
-                                tintColor={AppColors.brand.primary}
-                              />
-                              }
-                        />
-                    </List>
+
+                    <FlatList
+                        renderItem={conversation => this.renderItem(conversation)}
+                        data={dataSource}
+                        refreshing={isRefreshing}
+                        onRefresh={() => {this.fetchConversations(true)}}
+                        onEndReached={this.LoadMore}
+                        onEndReachedThreshold={100}
+                        keyExtractor={item => item.id}
+                    />
+
                 </View>
             </ActionSheet>
 

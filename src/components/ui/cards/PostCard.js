@@ -7,14 +7,14 @@ import moment from "moment";
 import React, {Component, PropTypes} from "react";
 import {
     StyleSheet,
+    TouchableWithoutFeedback,
+    Animated,
+    PanResponder,
     Image,
     View,
     TouchableOpacity,
     Clipboard
 } from "react-native";
-
-import {Icon} from "react-native-elements";
-import Animation from "lottie-react-native";
 
 // Actions
 import { Actions } from 'react-native-router-flux';
@@ -25,8 +25,82 @@ import { AppConfig } from '@constants/'
 import { getImageURL } from "@lib/util";
 
 // Components
-import {Image as ImageViewer, Avatar, Badge, Text} from "@ui/";
+import {Image as ImageViewer, Avatar, Badge, Text, Icon} from "@ui/";
 import { Toast } from "@ui/alerts/";
+
+/* Component ==================================================================== */
+class AnimatedLike extends Component {
+    static propTypes = {
+        onPress: PropTypes.func,
+        liked : PropTypes.bool,
+        count: PropTypes.number
+    };
+
+    static defaultProps = {
+        liked: false,
+        count: 0
+    };
+
+    constructor (props) {
+        super( props);
+
+        this.state = {
+            scale: new Animated.Value(1),
+            liked: props.liked,
+            count: props.count
+        };
+    }
+
+    _onPress = () => {
+        this.setState({
+            liked:true,
+            count : this.state.liked ? this.state.count : this.state.count + 1
+        })
+
+        Animated.timing(
+            this.state.scale,
+            {
+                toValue: 1.5,
+                friction: 1,
+                duration: 200
+            },
+        ).start();
+
+        setTimeout(() => {
+            Animated.spring(
+                this.state.scale,
+                {
+                    toValue: 1,
+                    friction: 1,
+                    duration: 200
+                },
+            ).start();
+        }, 50)
+
+        if (this.props.onPress) {
+            this.props.onPress();
+        }
+    }
+
+    render () {
+        return (
+
+                <TouchableWithoutFeedback onPress={this._onPress}>
+                    <View style={[AppStyles.row, AppStyles.centerAligned]}>
+                        <Animated.View
+                            style={[{transform: [ {scale: this.state.scale }]}, this.props.style]}
+                        >
+                            <Icon size={20} color={this.state.liked ? '#E05641' : '#A9AFB5'} type={'material-icons'} name={this.state.liked ? 'favorite' : 'favorite-border'} />
+                        </Animated.View>
+                    </View>
+                </TouchableWithoutFeedback>
+
+        );
+    }
+}
+
+
+
 
 /* Component ==================================================================== */
 class PostCard extends Component {
@@ -52,12 +126,26 @@ class PostCard extends Component {
     };
 
 
+    shouldComponentUpdate(nextProps, nextState){
+        return this.props.post != nextProps.post
+    }
+
     _onPressWatch = () => {
         const { post, onPressWatch, onPressUnWatch } = this.props
 
         if (post.w) {
             onPressUnWatch(post.id)
+            Toast.show('Post Unwatched!', {
+                shadow: true,
+                animation: true,
+                hideOnPress: true,
+            })
         }else {
+            Toast.show('Post Watched!', {
+                shadow: true,
+                animation: true,
+                hideOnPress: true,
+            })
             onPressWatch(post.id)
         }
 
@@ -82,8 +170,6 @@ class PostCard extends Component {
         const { post , onPressLike} = this.props;
 
         if (!post.gp){
-            this.animation.play();
-
             onPressLike(post.id, post.pid)
         }
     };
@@ -118,14 +204,17 @@ class PostCard extends Component {
 
         let options = ['Copy Post URL'];
 
-        let deleteIndex , reportIndex, featureIndex, copyIndex = 0;
-
+        let watchIndex, deleteIndex , reportIndex, featureIndex, copyIndex = 0;
 
         !post.featured ?  ( options[options.length] = 'Feature',  featureIndex = options.length - 1): null;
 
         deletable ? ( options[options.length] = 'Delete',  deleteIndex = options.length - 1) : null;
 
         reportable ? (options[options.length] = 'Report', reportIndex = options.length - 1) : null;
+
+        !post.w ?
+            ( options[options.length] = 'Turn On Post Notifications ',  watchIndex = options.length - 1):
+            ( options[options.length] = 'Turn Off Post Notifications ',  watchIndex = options.length - 1);
 
 
         this.context.actionSheet().showActionSheetWithOptions({
@@ -145,10 +234,70 @@ class PostCard extends Component {
                     case reportIndex:
                         onPressReport(post.id);
                         break;
-                    default:
+                    case watchIndex:
+                        this._onPressWatch()
                 }
             });
     };
+
+
+
+    renderContent = () => {
+        const { post } = this.props
+
+        let isGIF = false
+
+        // check if post content is gif
+        if (post.txt.split(/\n/)[0].endsWith('.gif') || ( post.txt.split(/\n/)[0].startsWith('.http') && post.txt.split(/\n/)[0].startsWith('.https')) ){
+            isGIF = true
+            this.gifURL = post.txt.split(/\n/)[0]
+            this.cleanText = post.txt.split(/\n/)[2]
+        }
+
+
+        if (isGIF){
+            return(
+                <View style={[styles.cardContent]}>
+                    {!!this.cleanText &&
+                    <View style={[AppStyles.row, styles.cardText]}>
+                        <Text style={[styles.postText]}>{ this.cleanText }</Text>
+                    </View>
+                    }
+                    <View style={[AppStyles.row, styles.cardImage]}>
+                        <ImageViewer
+                            disabled={false}
+                            source={{ uri: this.gifURL   }}
+                            doubleTapEnabled={true}
+                            onMove={(e, gestureState) => null}
+                            downloadable={true}
+                        />
+                    </View>
+                </View>
+            )
+        }else{
+            return(
+                <View style={[styles.cardContent]}>
+                    {!!post.txt &&
+                        <View style={[AppStyles.row, styles.cardText]}>
+                            <Text style={[styles.postText]}>{post.txt}</Text>
+                        </View>
+                    }
+                    {!!post.img &&
+                    <View style={[AppStyles.row, styles.cardImage]}>
+                        <ImageViewer
+                            disabled={false}
+                            source={{ uri: getImageURL(post.img)  }}
+                            doubleTapEnabled={true}
+                            onMove={(e, gestureState) => null}
+                            downloadable={true}
+                        />
+                    </View>
+                    }
+                </View>
+            )
+        }
+
+    }
 
     render = () => {
         const { post , onPressWatch } = this.props;
@@ -172,7 +321,7 @@ class PostCard extends Component {
                             <View style={[styles.postHeaderContainer]}>
                                 <View style={[AppStyles.row]}>
                                     {/*user name*/}
-                                    <Text>{post.name}</Text>
+                                    <Text style={[styles.usernameText]}>{post.name}</Text>
 
                                     {/*user badge*/}
                                     {!!post.ul && <Badge type={post.ul}/> }
@@ -192,87 +341,38 @@ class PostCard extends Component {
                             </View>
                         </View>
 
-                        <View style={[styles.cardContent]}>
-                            {!!post.img &&
-                            <View style={[AppStyles.row, styles.cardImage]}>
-                                <ImageViewer
-                                    disabled={false}
-                                    source={{ uri: getImageURL(post.img)  }}
-                                    doubleTapEnabled={true}
-                                    onMove={(e, gestureState) => null}
-                                    downloadable={true}
-                                />
-                            </View>
-                            }
-                            {!!post.txt &&
-                            <View style={AppStyles.row}>
-                                <Text style={[styles.postText]}>{post.txt}</Text>
-                            </View>
-                            }
+                        { this.renderContent()}
 
-                        </View>
                         <View style={[styles.cardAction]}>
-                            <View onPress={onPressWatch} style={AppStyles.flex1}>
-                                <TouchableOpacity  onPress={this._onPressWatch}>
-                                    <View  style={[AppStyles.row, AppStyles.centerAligned]}>
-                                        {!post.w ?
-                                            (
-                                                <Icon size={28} color={'grey'} type={'foundation'} name={'eye'} />
-                                            ) :
-                                            (
-                                                <Icon size={30} color={'#C02827'} type={'foundation'} name={'eye'} />
-                                            )
-                                        }
-                                    </View>
-                                </TouchableOpacity>
-                            </View>
-                            <View style={AppStyles.flex1}>
-                                <TouchableOpacity  onPress={this._onPressComments}>
-                                    <View style={[AppStyles.row, AppStyles.centerAligned]}>
-                                        <Icon size={22} color={'grey'} type={'material-community'} name={'comment-processing-outline'}/>
-                                        {post.cc !== 0 &&
-                                        <Text style={AppStyles.paddingLeftSml}>{post.cc}</Text>
-                                        }
-                                    </View>
-                                </TouchableOpacity>
-                            </View>
-                            <View style={AppStyles.flex1}>
-                                <TouchableOpacity  onPress={this._onPressLike} >
-                                    <View style={[AppStyles.row, AppStyles.centerAligned, {padding:18}]}>
-                                        {!post.gp ? (
-                                            <Animation
-                                                ref={animation => { this.animation = animation; }}
-                                                style={{
-                                              width: 180,
-                                              height: 180,
-                                              marginTop:-80,
-                                              marginBottom:-80,
-                                              marginLeft:-80,
-                                              marginRight:-80
-                                            }}
-                                                source={require('../../../animations/like.json')}
-                                            />
-                                        ) : (
-                                            <Animation
-                                                ref={animation => { this.animation = animation; }}
-                                                style={{
-                                              width: 180,
-                                              height: 180,
-                                              marginTop:-80,
-                                              marginBottom:-80,
-                                              marginLeft:-80,
-                                              marginRight:-80
-                                            }}
-                                                progress={1}
-                                                source={require('../../../animations/like.json')}
-                                            />
-                                        )}
+
+                            <View style={[AppStyles.flex4]}>
+                                <View style={[AppStyles.row]}>
                                         {post.pc !== 0 &&
-                                        <Text style={[AppStyles.paddingLeftSml]}>{post.pc}</Text>
+                                            <Text style={[AppStyles.paddingLeftSml,styles.cardActionText]}>{post.pc} Likes</Text>
                                         }
-                                    </View>
-                                </TouchableOpacity>
+                                        {post.cc !== 0 &&
+                                            <Text style={[AppStyles.paddingLeftSml , styles.cardActionText]}>{post.cc} Comments</Text>
+                                        }
+                                </View>
                             </View>
+
+                            <View style={AppStyles.flex1}>
+                                <View style={[AppStyles.row, {right:0}]}>
+                                    <TouchableOpacity  style={AppStyles.paddingRight} onPress={this._onPressComments}>
+                                        <View style={[AppStyles.row, AppStyles.centerAligned]}>
+                                            <Icon size={18} color={'#A9AFB5'} type={'font-awesome'} name={'comment-o'}/>
+                                        </View>
+                                    </TouchableOpacity>
+
+                                    <AnimatedLike
+                                        onPress={this._onPressLike}
+                                        liked={post.gp}
+                                        count={post.pc}
+                                    />
+                                </View>
+                            </View>
+
+
                         </View>
                     </View>
                 ) : (
@@ -294,7 +394,7 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
         backgroundColor: '#F5FCFF',
-        margin: 10,
+        margin: 5,
     },
     reportContainer:{
         paddingTop:10,
@@ -305,7 +405,7 @@ const styles = StyleSheet.create({
     },
     card: {
         backgroundColor: "#fff",
-        borderRadius: 15,
+        borderRadius: 3,
         shadowColor: "#000000",
         shadowOpacity: 0.3,
         shadowRadius: 1,
@@ -314,32 +414,46 @@ const styles = StyleSheet.create({
             width: 0.3,
         }
     },
-
+    usernameText:{
+        color:AppColors.textCard,
+        fontFamily: AppFonts.base.familyBold,
+        fontSize:AppFonts.base.size * 0.9,
+    },
     cardHeader: {
         padding: 10
     },
     cardImage:{
         alignItems: 'center',
         justifyContent: 'center',
-        paddingBottom:5
+        borderWidth:0.5,
+        borderColor:'#e2e2e2',
+        backgroundColor:'#E9EBEE'
     },
     cardContent: {
-        paddingRight: 16,
-        paddingLeft: 16,
         paddingTop: 6,
-        paddingBottom: 16,
+    },
+    cardText: {
+        paddingRight: 10,
+        paddingLeft: 10,
+        paddingBottom: 20,
+
     },
     cardAction: {
-        marginTop:5,
+        padding:8,
+        paddingRight:3,
+        paddingLeft:5,
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor:'#f1f1f1',
         borderWidth:0.3,
         borderTopRightRadius:0,
         borderTopLeftRadius:0,
         borderRadius:5,
         borderColor:'#b9b9b9'
 
+    },
+    cardActionText:{
+        color: AppColors.textSecondary,
+        fontSize: AppSizes.base * 0.9,
     },
     separator: {
         flex: 1,
@@ -358,14 +472,14 @@ const styles = StyleSheet.create({
     },
     postText:{
         fontFamily: AppFonts.base.family,
-        fontSize: AppFonts.base.size * 0.92,
-        color:AppColors.textPrimary
+        fontSize: AppFonts.base.size,
+        color:AppColors.textCard,
     },
     postOptions:{
         position: 'absolute',
         top: 2,
         bottom:2,
-        left: AppSizes.screen.width * 0.72,
+        left: AppSizes.screen.width * 0.75,
     },
     postHeaderContainer:{
         paddingLeft:8

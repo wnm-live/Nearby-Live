@@ -1,5 +1,7 @@
 'use strict';
 
+import uuid from 'uuid';
+
 import React, { Component, PropTypes } from 'react';
 
 import {
@@ -21,8 +23,8 @@ import RNFetchBlob from 'react-native-fetch-blob'
 import * as Progress from 'react-native-progress';
 
 //components
+import { Icon } from '@ui/'
 import { BottomAlert } from '@ui/alerts/'
-import { Icon } from 'react-native-elements';
 
 // consts
 import { AppSizes, AppStyles } from "@theme/"
@@ -60,9 +62,7 @@ const styles = StyleSheet.create({
     imageContainer:{
         alignItems: 'center',
         justifyContent: 'center',
-        marginBottom:5,
         height: 200,
-        width:AppSizes.screen.width * 0.85,
         borderWidth:2,
         borderColor:'transparent'
     }
@@ -148,8 +148,6 @@ export default class ImageViewer extends Component {
     }
 
     componentWillMount() {
-        const { source } = this.props;
-
         this.state.layout.x.addListener((animated) => this.handleLayoutChange(animated, LAYOUT_ENUM.X));
         this.state.layout.y.addListener((animated) => this.handleLayoutChange(animated, LAYOUT_ENUM.Y));
 
@@ -161,20 +159,28 @@ export default class ImageViewer extends Component {
             onPanResponderTerminate: this.handleRelease
         });
 
-        if (typeof source === 'object' && typeof source.uri === 'string') {
-            Image.prefetch(source.uri);
-            Image.getSize(source.uri, (width, height) => {
-                this._imageSize = { width, height };
-            });
-        }
+
     }
 
     componentDidMount() {
+        const { source } = this.props;
+
+        this.mounted = true;
+
         if (this.props.threshold) {
             this._thresholdTimer = setTimeout(() => {
                 this.setState({ thresholdReached: true });
                 this._thresholdTimer = null;
             }, this.props.threshold);
+        }
+
+        if (typeof source === 'object' && typeof source.uri === 'string' && this.mounted) {
+            Image.prefetch(source.uri);
+            Image.getSize(source.uri, (width, height) => {
+                this._imageSize = { width, height };
+            });
+        }else {
+            return
         }
     }
 
@@ -194,6 +200,8 @@ export default class ImageViewer extends Component {
 
         this.state.layout.x.removeAllListeners();
         this.state.layout.y.removeAllListeners();
+
+        this.mounted = false;
     }
 
 
@@ -246,17 +254,30 @@ export default class ImageViewer extends Component {
 
     handleDownloadImage = () => {
         let uri = this.refs.originalImage.props.source.uri;
+
+        if (uri.endsWith('.gif')){
+            this.refs.alert.show('Unfortunately can not download GIF right now.','error' )
+            return
+        }
+
         if (Platform.OS === 'ios'){
             let promise = CameraRoll.saveToCameraRoll(uri, 'photo');
             promise.then(res => (
                 this.refs.alert.show('Photo saved successfully!','success' )
             ))
         }else {
-            const ret = RNFetchBlob.config({ fileCache : true,}).fetch('GET', uri)
+            const ret = RNFetchBlob.config({
+                fileCache : true,
+                path : `${RNFetchBlob.fs.dirs.DocumentDir}/${uuid.v4()}.jpg`
+            }).fetch('GET', uri)
+
             this.refs.alert.show('Downloading ...','info',false )
+
             ret.then(res => {
-                let promise = CameraRoll.saveToCameraRoll(res.path(), 'photo');
-                promise.then(res => {
+                let promise = CameraRoll.saveToCameraRoll(`file://${res.path()}`, 'photo');
+                promise.then(cres => {
+                    // removed cache file
+                    res.flush()
                     this.refs.alert.show('Photo saved successfully!','success' )
                 })
             });
@@ -447,12 +468,12 @@ export default class ImageViewer extends Component {
         })
 
 
-        let width = this._imageSize.width * ( AppSizes.screen.width * 0.85 / this._imageSize.width);
-        let height = this._imageSize.height * ( AppSizes.screen.height * 0.50/ this._imageSize.height);
+        let width = this._imageSize.width * ( AppSizes.screen.width  / this._imageSize.width);
+        let height = this._imageSize.height * ( AppSizes.screen.height * 0.60/ this._imageSize.height);
 
 
         return (
-            <Animated.View>
+            <View>
                 <Animated.View style={[styles.imageContainer]}>
                     <TouchableWithoutFeedback
                         onPress={this.toggleModal}
@@ -535,7 +556,7 @@ export default class ImageViewer extends Component {
 
                     <BottomAlert ref="alert" />
                 </Modal>
-            </Animated.View>
+            </View>
         );
     }
 }

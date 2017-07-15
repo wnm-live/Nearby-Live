@@ -186,7 +186,7 @@ export default {
         left: 0,
         right: 0,
         borderBottomWidth: 1,
-        borderBottomColor: Colors.border,
+        borderBottomColor: '#cbd9dc',
         height: 1,
         backgroundColor: 'transparent',
         marginTop: Sizes.paddingSml,
@@ -235,8 +235,8 @@ export default {
     // TabBar
     tabbar: {
         backgroundColor: Colors.tabbar.background,
-        borderTopColor: Colors.border,
-        borderTopWidth: 1,
+        // borderTopColor: Colors.border,
+        // borderTopWidth: 1,
     },
 
 

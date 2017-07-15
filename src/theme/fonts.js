@@ -14,9 +14,11 @@ const base = {
   ...Platform.select({
     ios: {
       family: 'HelveticaNeue',
+      familyBold:'HelveticaNeue',
     },
     android: {
-      family: 'Roboto',
+      family: 'OpenSans-Reqular',
+      familyBold:  'OpenSans-Bold'
     },
   }),
 };
